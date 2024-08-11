@@ -69,7 +69,7 @@ mark_read_flag=false
 update_subscription_url=''
 
 # The minimum fzf version that the user needs to run all interactive commands.
-MIN_FZF_VERSION="0.29.0"
+MIN_FZF_VERSION="0.45.0"
 
 ###############################################################################
 # Debugging and Error Handling Configuration
@@ -306,11 +306,8 @@ print_notifs() {
     result=$(command grep -v "$exclusion_string" <<<"$all_notifs" | command grep "$filter_string" | command column -ts $'\t')
     # if the value is greater than the initial start value, we assume to be in the 'fzf’ reload function
     if [[ -z $result && $SHLVL -gt $NESTED_START_LVL ]]; then
-        # TODO: exit fzf automatically if the list is empty after a reload
-        # it does work with '--bind "zero:become:"', but this only came with version '0.40.0'
-        # workaround, since fzf hides the first elements with '--with-nth 6..'
-        # if the list is empty on a reload, the message would be hidden, so ' \b' (backspace) is added
-        echo -e " \b \b \b \b \b$FINAL_MSG"
+        # exit fzf automatically if the list is empty after a reload
+        :
     else
         echo "$result"
     fi
@@ -554,16 +551,17 @@ select_notif() {
     output=$(
         SHELL="$(which bash)" FZF_DEFAULT_OPTS="${FZF_DEFAULT_OPTS-} ${GH_NOTIFY_FZF_OPTS-}" command fzf \
             --ansi \
+            --bind "zero:become:" \
             --bind "${GH_NOTIFY_RESIZE_PREVIEW_KEY}:change-preview-window(75%:nohidden|75%:down:nohidden:border-top|nohidden)" \
             --bind "change:first" \
             --bind "${GH_NOTIFY_MARK_ALL_READ_KEY}:select-all+execute-silent(if [[ -z {q} && \$FINAL_MSG =~ 'All caught up' ]]; then mark_all_read {}; else mark_individual_read {+f}; fi)+reload:print_notifs || true" \
-            --bind "${GH_NOTIFY_OPEN_BROWSER_KEY}:execute-silent:open_in_browser {}" \
+            --bind "${GH_NOTIFY_OPEN_BROWSER_KEY}:execute-silent(mark_individual_read {f}; open_in_browser {})+transform:[[ {3} == 'UNREAD' ]] && echo 'reload:print_notifs || true'" \
             --bind "${GH_NOTIFY_VIEW_DIFF_KEY}:toggle-preview+change-preview:if command grep -q PullRequest <<<{10}; then command gh pr diff {11} --repo {5}  | highlight_output; else view_notification {}; fi" \
             --bind "${GH_NOTIFY_VIEW_PATCH_KEY}:toggle-preview+change-preview:if command grep -q PullRequest <<<{10}; then command gh pr diff {11} --patch --repo {5} | highlight_output; else view_notification {}; fi" \
             --bind "${GH_NOTIFY_RELOAD_KEY}:reload:print_notifs || true" \
             --bind "${GH_NOTIFY_MARK_READ_KEY}:execute-silent(mark_individual_read {+f})+reload:print_notifs || true" \
             --bind "${GH_NOTIFY_TOGGLE_KEY}:toggle+down" \
-            --bind "${GH_NOTIFY_VIEW_KEY}:execute:view_in_pager {}" \
+            --bind "${GH_NOTIFY_VIEW_KEY}:execute(mark_individual_read {f}; view_in_pager {})+transform:[[ {3} == 'UNREAD' ]] && echo 'reload:print_notifs || true'" \
             --bind "${GH_NOTIFY_TOGGLE_PREVIEW_KEY}:toggle-preview+change-preview:view_notification {}" \
             --bind "${GH_NOTIFY_TOGGLE_HELP_KEY}:toggle-preview+change-preview:print_help_text" \
             --border horizontal \
@@ -583,6 +581,10 @@ select_notif() {
             --reverse \
             --with-nth 6.. <<<"$1"
     )
+    [[ -z $output ]] && {
+        echo "$FINAL_MSG"
+        exit 0
+    }
     # actions that close fzf are defined below
     # 1st line ('--expect'): the actual key
     # 2nd line: the selected line when the user pressed the key
