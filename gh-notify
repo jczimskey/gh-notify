@@ -553,7 +553,7 @@ select_notif() {
             --ansi \
             --bind "zero:become:" \
             --bind "${GH_NOTIFY_RESIZE_PREVIEW_KEY}:change-preview-window(75%:nohidden|75%:down:nohidden:border-top|nohidden)" \
-            --bind "change:first" \
+            --bind "change:first+unbind:zero" \
             --bind "${GH_NOTIFY_MARK_ALL_READ_KEY}:select-all+execute-silent(if [[ -z {q} && \$FINAL_MSG =~ 'All caught up' ]]; then mark_all_read {}; else mark_individual_read {+f}; fi)+reload:print_notifs || true" \
             --bind "${GH_NOTIFY_OPEN_BROWSER_KEY}:execute-silent(mark_individual_read {f}; open_in_browser {})+transform:[[ {3} == 'UNREAD' ]] && echo 'reload:print_notifs || true'" \
             --bind "${GH_NOTIFY_VIEW_DIFF_KEY}:toggle-preview+change-preview:if command grep -q PullRequest <<<{10}; then command gh pr diff {11} --repo {5}  | highlight_output; else view_notification {}; fi" \
