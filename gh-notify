@@ -548,6 +548,27 @@ select_notif() {
     # a failed 'print_notifs' call, but does not display the message.
 
     # See the man page (man fzf) for an explanation of the arguments.
+
+    # Reason for using TERM=dumb before 'gh' calls inside 'execute(...)':
+    #
+    # https://github.com/junegunn/fzf/discussions/4467
+    #
+    # [23/May/2024] fzf 'execute' action provides the command with a full interactive terminal
+    # (TTY). Newer versions of 'gh' and its dependencies unconditionally query this TTY for features
+    # (e.g., background color), even for non-interactive commands. This causes the terminal's
+    # response (escape codes) to leak into the output.
+    #
+    # This issue does not occur with 'execute-silent', which does not provide a TTY, or when piping
+    # gh into cat. Still seems buggy and 'gh' should provide a env varibale for disabling.
+    #
+    # The problematic behavior in 'gh' was introduced in two key stages:
+    # 1. [21/Mar/2025] Thematic Headers (https://github.com/cli/cli/commit/6355e54e): 'gh' itself
+    #    began querying the terminal. This could be suppressed with 'NO_COLOR=1'.
+    #
+    # 2. [31/Mar/2025] Accessible Prompter (https://github.com/cli/cli/commit/202c1ad1): A new
+    #    dependency ('bubbletea') was added. It performs its own terminal query during its 'init()'
+    #    phase, which cannot be disabled by 'gh'-specific flags like 'NO_COLOR'. Setting 'TERM=dumb'
+    #    does.
     output=$(
         SHELL="$(which bash)" FZF_DEFAULT_OPTS="${FZF_DEFAULT_OPTS-} ${GH_NOTIFY_FZF_OPTS-}" command fzf \
             --ansi \
@@ -561,7 +582,7 @@ select_notif() {
             --bind "${GH_NOTIFY_RELOAD_KEY}:reload:print_notifs || true" \
             --bind "${GH_NOTIFY_MARK_READ_KEY}:execute-silent(mark_individual_read {+f})+reload:print_notifs || true" \
             --bind "${GH_NOTIFY_TOGGLE_KEY}:toggle+down" \
-            --bind "${GH_NOTIFY_VIEW_KEY}:execute(mark_individual_read {f}; view_in_pager {})+transform:[[ {3} == 'UNREAD' ]] && echo 'reload:print_notifs || true'" \
+            --bind "${GH_NOTIFY_VIEW_KEY}:execute(TERM=dumb mark_individual_read {f}; view_in_pager {})+transform:[[ {3} == 'UNREAD' ]] && echo 'reload:print_notifs || true'" \
             --bind "${GH_NOTIFY_TOGGLE_PREVIEW_KEY}:toggle-preview+change-preview:view_notification {}" \
             --bind "${GH_NOTIFY_TOGGLE_HELP_KEY}:toggle-preview+change-preview:print_help_text" \
             --border horizontal \
