@@ -450,7 +450,22 @@ view_notification() {
             command gh issue view "$number" --repo "$repo_full_name" ${all_comments:+"--comments"}
             ;;
         PullRequest)
-            command gh pr view "$number" --repo "$repo_full_name" ${all_comments:+"--comments"}
+            local fields="number,title,state,author,createdAt,baseRefName,headRefName,body,url,reviewDecision,assignees,labels,milestone"
+            local template
+            template="{{printf \"#%v\" .number | autocolor \"green\"}} {{.title | autocolor \"bold\"}}
+{{.state | autocolor \"bold\"}} • {{.author.login | autocolor \"bold\"}} wants to merge into {{.baseRefName | autocolor \"cyan\"}} from {{.headRefName | autocolor \"cyan\"}} • {{timeago .createdAt}}
+{{if .reviewDecision}}Reviewers: {{.reviewDecision}}
+{{end}}{{if .assignees}}Assignees: {{range .assignees}}{{.login}} {{end}}
+{{end}}{{if .milestone}}Milestone: {{.milestone.title}}
+{{end}}{{if .labels}}Labels: {{range .labels}}{{.name}} {{end}}
+{{end}}
+{{.body}}"
+
+            if [[ -n "${all_comments:-}" ]]; then
+                fields+=",comments"
+                template+=$'\n\n{{range .comments}}\n---\n{{.author.login | autocolor "bold"}} • {{timeago .createdAt}}\n{{.body}}\n{{end}}'
+            fi
+            command gh pr view "$number" --repo "$repo_full_name" --json "$fields" --template "$template"
             ;;
         Pre-release | Release)
             command gh release view "$number" --repo "$repo_full_name"
